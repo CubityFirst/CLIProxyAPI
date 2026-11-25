@@ -180,7 +180,10 @@ access:
 
 # Routing strategy for selecting credentials when multiple match.
 routing:
-  strategy: "round-robin" # round-robin (default), weighted-round-robin, fill-first
+  strategy: "round-robin" # round-robin (default), weighted-round-robin, fill-first, soonest-reset
+  # soonest-reset drains the OAuth credential whose weekly quota resets soonest (Claude
+  # anthropic-ratelimit-unified-7d-reset), using the 5h reset as a tiebreak. Credentials that
+  # have not reported quota headers yet are tried first once; API keys are used last.
   # weighted-round-robin uses each credential's integer weight (default 1, maximum 1,000,000).
   # Non-positive weights exclude the credential while this strategy is active.
   # Sticky requests (including inherited and LCP bindings) also consume weighted credits
