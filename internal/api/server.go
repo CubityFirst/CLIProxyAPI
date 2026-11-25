@@ -116,6 +116,10 @@ type Server struct {
 	keepAliveHeartbeat chan struct{}
 	keepAliveStop      chan struct{}
 
+	// quotaHistoryStop stops the quota history recorder; quotaHistoryDone closes after its final save.
+	quotaHistoryStop context.CancelFunc
+	quotaHistoryDone <-chan struct{}
+
 	exampleAPIKeySafeModeEnabled bool
 	exampleAPIKeySafeModeActive  atomic.Bool
 }
@@ -335,6 +339,11 @@ func (s *Server) Start() error {
 	if errListen != nil {
 		return fmt.Errorf("failed to start HTTP server: %v", errListen)
 	}
+	if s.mgmt != nil && s.quotaHistoryStop == nil {
+		historyCtx, stopHistory := context.WithCancel(context.Background())
+		s.quotaHistoryStop = stopHistory
+		s.quotaHistoryDone = s.mgmt.StartQuotaHistory(historyCtx)
+	}
 
 	cfg := s.getConfig()
 	useTLS := cfg != nil && cfg.TLS.Enable
@@ -510,6 +519,13 @@ func (s *Server) Stop(ctx context.Context) error {
 	}
 	if s.tunnelHub != nil {
 		s.tunnelHub.Close()
+	}
+	if s.quotaHistoryStop != nil {
+		s.quotaHistoryStop()
+		select {
+		case <-s.quotaHistoryDone:
+		case <-ctx.Done():
+		}
 	}
 	if errCloseServer != nil {
 		return fmt.Errorf("failed to shutdown HTTP server: %v", errCloseServer)
