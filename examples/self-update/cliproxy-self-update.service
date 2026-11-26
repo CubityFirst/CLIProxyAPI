@@ -1,0 +1,10 @@
+[Unit]
+Description=Install a CLIProxyAPI release requested from the Management Center
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/cliproxy-self-update
+# Download, restart, a 20-second health check and a possible rollback.
+TimeoutStartSec=15min

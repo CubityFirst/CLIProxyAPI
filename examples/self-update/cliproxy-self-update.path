@@ -1,0 +1,11 @@
+[Unit]
+Description=Watch for CLIProxyAPI update requests from the Management Center
+
+[Path]
+# Must match UPDATE_DIR in /etc/cliproxy-self-update.env and
+# remote-management.server-update-dir in config.yaml.
+PathExists=/home/cliproxy/cliproxy/update/request.json
+Unit=cliproxy-self-update.service
+
+[Install]
+WantedBy=multi-user.target

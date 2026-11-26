@@ -554,6 +554,13 @@ type RemoteManagement struct {
 	// PanelGitHubRepository overrides the GitHub repository used to fetch the management panel asset.
 	// Accepts either a repository URL (https://github.com/org/repo) or an API releases endpoint.
 	PanelGitHubRepository string `yaml:"panel-github-repository"`
+	// ServerUpdateRepository is the GitHub repository (owner/repo or URL) whose releases provide
+	// builds of this server, for the management update check. Empty disables the check.
+	ServerUpdateRepository string `yaml:"server-update-repository,omitempty" json:"server-update-repository,omitempty"`
+	// ServerUpdateDir is a directory shared with the host's privileged update helper
+	// (examples/self-update): the server writes request.json there and reads the helper's
+	// status.json. Empty disables update requests; the server never replaces its own binary.
+	ServerUpdateDir string `yaml:"server-update-dir,omitempty" json:"server-update-dir,omitempty"`
 	// BaseURL specifies the base URL of the remote management API for TUI client mode (e.g. "https://proxy.example.com").
 	BaseURL string `yaml:"base-url,omitempty" json:"base-url,omitempty"`
 }
