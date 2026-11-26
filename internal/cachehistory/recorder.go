@@ -28,6 +28,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -350,9 +351,7 @@ func (r *Recorder) tallyLocked(authID string, at time.Time, reason string) *Tall
 		i--
 	}
 	if i == 0 || s.Buckets[i-1].At != start {
-		s.Buckets = append(s.Buckets, Bucket{})
-		copy(s.Buckets[i+1:], s.Buckets[i:])
-		s.Buckets[i] = Bucket{At: start, Reasons: make(map[string]*Tally)}
+		s.Buckets = slices.Insert(s.Buckets, i, Bucket{At: start, Reasons: make(map[string]*Tally)})
 		i++
 	}
 	bucket := &s.Buckets[i-1]
