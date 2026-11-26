@@ -116,7 +116,7 @@ type Server struct {
 	keepAliveHeartbeat chan struct{}
 	keepAliveStop      chan struct{}
 
-	// quotaHistoryStop stops the quota history recorder; quotaHistoryDone closes after its final save.
+	// quotaHistoryStop stops the quota and cache history recorders; quotaHistoryDone closes after their final save.
 	quotaHistoryStop context.CancelFunc
 	quotaHistoryDone <-chan struct{}
 
@@ -342,7 +342,7 @@ func (s *Server) Start() error {
 	if s.mgmt != nil && s.quotaHistoryStop == nil {
 		historyCtx, stopHistory := context.WithCancel(context.Background())
 		s.quotaHistoryStop = stopHistory
-		s.quotaHistoryDone = s.mgmt.StartQuotaHistory(historyCtx)
+		s.quotaHistoryDone = s.mgmt.StartHistory(historyCtx)
 	}
 
 	cfg := s.getConfig()

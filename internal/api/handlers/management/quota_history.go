@@ -9,9 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/quotahistory"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/util"
 	coreauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	log "github.com/sirupsen/logrus"
 )
 
 const (
@@ -19,33 +17,30 @@ const (
 	maxQuotaHistoryDays     = 21
 )
 
-// StartQuotaHistory begins recording quota history into the auth directory.
-// The returned channel closes once recording stopped and history was saved
-// after ctx is cancelled.
-func (h *Handler) StartQuotaHistory(ctx context.Context) <-chan struct{} {
+// StartHistory begins recording quota and prompt-cache history into the auth
+// directory. The returned channel closes once both recorders stopped and saved
+// their history after ctx is cancelled.
+func (h *Handler) StartHistory(ctx context.Context) <-chan struct{} {
 	done := make(chan struct{})
 	if h == nil {
 		close(done)
 		return done
 	}
-	h.mu.Lock()
-	authDir := ""
-	if h.cfg != nil {
-		authDir = h.cfg.AuthDir
-	}
-	h.mu.Unlock()
-	resolved, errResolve := util.ResolveAuthDir(authDir)
-	if errResolve != nil {
-		log.Warnf("quota history: %v; history will not persist", errResolve)
-		resolved = ""
-	}
-	recorder := quotahistory.New(resolved)
+	dir := h.resolveHistoryDir()
+	recorder := quotahistory.New(dir)
 	h.mu.Lock()
 	h.quotaHistory = recorder
 	h.mu.Unlock()
+	quotaDone := make(chan struct{})
+	go func() {
+		defer close(quotaDone)
+		recorder.Run(ctx, h.quotaHistoryAuths)
+	}()
+	cacheDone := h.startCacheHistory(ctx, dir)
 	go func() {
 		defer close(done)
-		recorder.Run(ctx, h.quotaHistoryAuths)
+		<-quotaDone
+		<-cacheDone
 	}()
 	return done
 }
