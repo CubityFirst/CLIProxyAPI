@@ -235,6 +235,13 @@ routing:
   #     keep the binding and return the error (or retry the same credential) instead.
   # Ignored when routing.session-affinity is false.
   session-affinity-rebind-on: "any"
+  # Move an established session to a credential whose weekly quota resets within this window
+  # (and before the bound credential's), so quota that would otherwise expire unused is spent
+  # first. Each move costs the session one prompt-cache rewrite on the new credential.
+  # Credentials that have used 90% or more of their weekly or 5-hour window are skipped.
+  # Only Claude OAuth credentials report weekly resets. Empty or "0" disables (default).
+  # Ignored when routing.session-affinity is false.
+  session-affinity-expiring-window: ""
 
   # When true, unprefixed model requests only use credentials without a prefix (except when prefix == model name).
   force-model-prefix: false

@@ -55,6 +55,9 @@ func (h *Handler) cacheHistorySettings() cachehistory.Settings {
 		if strings.TrimSpace(settings.RebindOn) == "" {
 			settings.RebindOn = "any"
 		}
+		if coreauth.ParseExpiringWindow(routing.SessionAffinityExpiringWindow) > 0 {
+			settings.ExpiringWindow = strings.TrimSpace(routing.SessionAffinityExpiringWindow)
+		}
 	}
 	return settings
 }

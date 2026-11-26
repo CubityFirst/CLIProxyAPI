@@ -105,6 +105,7 @@ type Settings struct {
 	SessionAffinity bool   `json:"session_affinity"`
 	AffinityTTL     string `json:"affinity_ttl,omitempty"`
 	RebindOn        string `json:"rebind_on,omitempty"`
+	ExpiringWindow  string `json:"expiring_window,omitempty"`
 }
 
 // Marker records when routing settings took effect.
@@ -216,6 +217,7 @@ func (r *Recorder) RecordSettings(settings Settings) {
 	settings.Strategy = strings.ToLower(strings.TrimSpace(settings.Strategy))
 	settings.AffinityTTL = strings.TrimSpace(settings.AffinityTTL)
 	settings.RebindOn = strings.ToLower(strings.TrimSpace(settings.RebindOn))
+	settings.ExpiringWindow = strings.TrimSpace(settings.ExpiringWindow)
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if n := len(r.markers); n > 0 && r.markers[n-1].Settings == settings {

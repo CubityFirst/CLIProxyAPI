@@ -1409,6 +1409,9 @@ type SessionAffinitySelector struct {
 	subagentAffinity  bool
 	rebindOnQuotaOnly bool
 	rebindOnNever     bool
+	// expiringWindow moves bound sessions to a credential whose weekly quota
+	// resets within this window; zero keeps bindings as they are.
+	expiringWindow time.Duration
 }
 
 const (
@@ -1570,6 +1573,10 @@ type SessionAffinityConfig struct {
 	TTL              time.Duration
 	SubagentAffinity *bool
 	RebindOn         string
+	// ExpiringWindow moves an established session to a credential whose weekly
+	// quota resets within this window and before the bound credential's. Zero
+	// disables it.
+	ExpiringWindow time.Duration
 }
 
 // NewSessionAffinitySelector creates a new session-aware selector.
@@ -1600,6 +1607,7 @@ func NewSessionAffinitySelectorWithConfig(cfg SessionAffinityConfig) *SessionAff
 		subagentAffinity:  subagentAffinity,
 		rebindOnQuotaOnly: rebindMode == SessionAffinityRebindOnQuota,
 		rebindOnNever:     rebindMode == SessionAffinityRebindOnNever,
+		expiringWindow:    cfg.ExpiringWindow,
 	}
 }
 
@@ -1733,6 +1741,11 @@ func (s *SessionAffinitySelector) Pick(ctx context.Context, provider, model stri
 	if cachedAuthID, ok := s.cache.GetAndRefresh(cacheKey); ok {
 		for _, auth := range available {
 			if auth.ID == cachedAuthID {
+				if target := expiringQuotaTarget(fallbackAuths, auth, now, s.expiringWindow); target != nil {
+					bind(target.ID, true)
+					entry.Infof("session-affinity: moved to credential with expiring weekly quota | session=%s from=%s auth=%s provider=%s model=%s", truncateSessionID(primaryID), auth.ID, target.ID, provider, model)
+					return s.pickWithAffinityReservation(ctx, provider, model, opts, available, target, &reservation)
+				}
 				bind(auth.ID, true)
 				entry.Infof("session-affinity: cache hit | session=%s auth=%s provider=%s model=%s", truncateSessionID(primaryID), auth.ID, provider, model)
 				return s.pickWithAffinityReservation(ctx, provider, model, opts, available, auth, &reservation)

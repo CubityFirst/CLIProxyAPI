@@ -612,6 +612,15 @@ type RoutingConfig struct {
 	//     keep the binding and return the error (or retry the same credential) instead.
 	// Ignored when SessionAffinity is false.
 	SessionAffinityRebindOn string `yaml:"session-affinity-rebind-on,omitempty" json:"session-affinity-rebind-on,omitempty"`
+
+	// SessionAffinityExpiringWindow lets an established session move to another credential
+	// whose weekly quota resets within this window and before the bound credential's, so
+	// quota that would otherwise expire unused is spent first. Each move costs the session one
+	// prompt-cache rewrite on the new credential. Candidates that have used 90% or more of
+	// their weekly or 5-hour window are skipped. Only Claude OAuth credentials report weekly
+	// resets. Accepts duration strings like "6h" or "24h"; empty or "0" disables (default).
+	// Ignored when SessionAffinity is false.
+	SessionAffinityExpiringWindow string `yaml:"session-affinity-expiring-window,omitempty" json:"session-affinity-expiring-window,omitempty"`
 }
 
 // OAuthModelAlias defines a model ID alias for a specific channel.

@@ -162,16 +162,21 @@ func TestSettingsMarkersAndSnapshotRange(t *testing.T) {
 	r.RecordSettings(Settings{Strategy: "soonest-reset"})
 	*now = baseTime.Add(3 * time.Hour)
 	r.RecordSettings(Settings{Strategy: "soonest-reset", SessionAffinity: true, AffinityTTL: "1h", RebindOn: "quota"})
+	*now = baseTime.Add(4 * time.Hour)
+	r.RecordSettings(Settings{Strategy: "soonest-reset", SessionAffinity: true, AffinityTTL: "1h", RebindOn: "quota", ExpiringWindow: " 24h "})
 
 	_, markers := r.Snapshot(baseTime.Add(150 * time.Minute))
-	if len(markers) != 2 {
+	if len(markers) != 3 {
 		t.Fatalf("markers = %+v, want the one in effect at the range start plus the later change", markers)
 	}
 	if markers[0].Strategy != "soonest-reset" || markers[0].SessionAffinity {
 		t.Fatalf("first marker = %+v", markers[0])
 	}
-	if !markers[1].SessionAffinity || markers[1].RebindOn != "quota" {
+	if !markers[1].SessionAffinity || markers[1].RebindOn != "quota" || markers[1].ExpiringWindow != "" {
 		t.Fatalf("second marker = %+v", markers[1])
+	}
+	if markers[2].ExpiringWindow != "24h" {
+		t.Fatalf("third marker = %+v, want the expiring window change recorded", markers[2])
 	}
 }
 

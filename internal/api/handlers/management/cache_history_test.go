@@ -29,6 +29,7 @@ func TestGetCacheHistoryReturnsSeriesWithLabelsAndSettings(t *testing.T) {
 	cfg.Routing.Strategy = "soonest-reset"
 	cfg.Routing.SessionAffinity = true
 	cfg.Routing.SessionAffinityTTL = "1h"
+	cfg.Routing.SessionAffinityExpiringWindow = "24h"
 	h := NewHandlerWithoutConfigFilePath(cfg, manager)
 
 	recorder := cachehistory.New("")
@@ -62,7 +63,7 @@ func TestGetCacheHistoryReturnsSeriesWithLabelsAndSettings(t *testing.T) {
 	if payload.Days != 2 || len(payload.Series) != 1 || payload.Series[0].Label != "Team A" {
 		t.Fatalf("payload = %+v", payload)
 	}
-	if len(payload.Markers) != 1 || payload.Markers[0].RebindOn != "any" || !payload.Markers[0].SessionAffinity {
+	if len(payload.Markers) != 1 || payload.Markers[0].RebindOn != "any" || !payload.Markers[0].SessionAffinity || payload.Markers[0].ExpiringWindow != "24h" {
 		t.Fatalf("markers = %+v, want soonest-reset with affinity and default rebind", payload.Markers)
 	}
 }

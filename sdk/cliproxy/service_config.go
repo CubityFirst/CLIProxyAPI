@@ -61,6 +61,7 @@ type routingRuntimeState struct {
 	sessionAffinityTTL       time.Duration
 	sessionAffinitySubagents bool
 	sessionAffinityRebindOn  string
+	sessionAffinityExpiring  time.Duration
 }
 
 func normalizedRoutingRuntimeState(cfg *config.Config) routingRuntimeState {
@@ -101,6 +102,7 @@ func normalizedRoutingRuntimeState(cfg *config.Config) routingRuntimeState {
 		case coreauth.SessionAffinityRebindOnNever:
 			state.sessionAffinityRebindOn = coreauth.SessionAffinityRebindOnNever
 		}
+		state.sessionAffinityExpiring = coreauth.ParseExpiringWindow(cfg.Routing.SessionAffinityExpiringWindow)
 	}
 	return state
 }
@@ -132,6 +134,7 @@ func newRoutingSelectorWithExisting(state routingRuntimeState, existing coreauth
 			TTL:              state.sessionAffinityTTL,
 			SubagentAffinity: &subagents,
 			RebindOn:         state.sessionAffinityRebindOn,
+			ExpiringWindow:   state.sessionAffinityExpiring,
 		})
 	}
 	return selector
