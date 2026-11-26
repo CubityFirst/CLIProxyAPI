@@ -21,6 +21,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/MoeForge/moego/json"
@@ -37,6 +38,11 @@ const (
 	serverUpdateRequestFile = "request.json"
 	serverUpdateStatusFile  = "status.json"
 	serverUpdateMaxStatus   = 64 << 10
+	// serverReleaseCacheTTL bounds how often the update endpoints ask GitHub for the
+	// latest release. The panel polls every few seconds while an update runs, and GitHub
+	// allows 60 unauthenticated API requests an hour per address, which the host helper
+	// and the panel updater need too.
+	serverReleaseCacheTTL = time.Minute
 )
 
 // githubAPIBaseURL is a variable so tests can point it at a local server.
@@ -68,6 +74,24 @@ type serverUpdateResponse struct {
 	Pending         bool                 `json:"pending"`
 	Status          json.RawMessage      `json:"status,omitempty"`
 	Error           string               `json:"error,omitempty"`
+}
+
+// serverReleaseCache keeps the last latest-release lookup (a release, "none" or an
+// error) for serverReleaseCacheTTL.
+type serverReleaseCache struct {
+	mu        sync.Mutex
+	key       string
+	checkedAt time.Time
+	release   *serverUpdateRelease
+	err       error
+	nowFunc   func() time.Time
+}
+
+func (cache *serverReleaseCache) now() time.Time {
+	if cache.nowFunc != nil {
+		return cache.nowFunc()
+	}
+	return time.Now()
 }
 
 type githubReleaseAsset struct {
@@ -209,6 +233,29 @@ func (h *Handler) fetchLatestServerRelease(c *gin.Context, repo, proxyURL string
 	return out, nil
 }
 
+// latestServerRelease is fetchLatestServerRelease, reusing a lookup of the same repository
+// from the last serverReleaseCacheTTL. Holding the lock while fetching also folds
+// concurrent checks into one request.
+func (h *Handler) latestServerRelease(c *gin.Context, repo, proxyURL string) (*serverUpdateRelease, error) {
+	cache := &h.serverRelease
+	key := githubAPIBaseURL + "/repos/" + repo
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+	if cache.key != key || cache.now().Sub(cache.checkedAt) >= serverReleaseCacheTTL {
+		release, err := h.fetchLatestServerRelease(c, repo, proxyURL)
+		if c.Request.Context().Err() != nil {
+			// The caller went away mid-request; don't keep that as the answer.
+			return release, err
+		}
+		cache.key, cache.checkedAt, cache.release, cache.err = key, cache.now(), release, err
+	}
+	if cache.release == nil {
+		return nil, cache.err
+	}
+	release := *cache.release
+	return &release, cache.err
+}
+
 // serverUpdateState gathers everything both endpoints need. A failed GitHub check is
 // reported in Error rather than failing the request, so the helper status stays visible.
 func (h *Handler) serverUpdateState(c *gin.Context) (serverUpdateResponse, string) {
@@ -234,7 +281,7 @@ func (h *Handler) serverUpdateState(c *gin.Context) (serverUpdateResponse, strin
 		}
 		return resp, dir
 	}
-	latest, err := h.fetchLatestServerRelease(c, repo, strings.TrimSpace(cfg.ProxyURL))
+	latest, err := h.latestServerRelease(c, repo, strings.TrimSpace(cfg.ProxyURL))
 	if err != nil {
 		resp.Error = err.Error()
 		return resp, dir

@@ -119,6 +119,8 @@ fi
 journalctl -u "$SERVICE" --since "-3min" --no-pager | tail -40 || true
 systemctl stop "$SERVICE" || true
 cp -p "$BACKUP" "$BIN"
+# A crash-looping release can trip the unit's start rate limit, which would refuse this start.
+systemctl reset-failed "$SERVICE" 2>/dev/null || true
 systemctl start "$SERVICE" || true
 if healthy "${FROM:-}"; then
   status rolled_back "$VERSION did not come up healthy; restored ${FROM:-the previous binary}"

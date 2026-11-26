@@ -169,7 +169,7 @@ retain the corresponding business operation's fields.
 | `/config/upstream/<provider>` | GET, PUT, PATCH, DELETE | Manage shared provider settings. |
 | `/server/server-id` | GET | Get the active deployment UUID. |
 | `/server/latest-version` | GET | Get latest release information. |
-| `/server/update` | GET | Check `remote-management.server-update-repository` for a newer release; includes the host update helper's status. |
+| `/server/update` | GET | Check `remote-management.server-update-repository` for a newer release (GitHub's answer is reused for a minute); includes the host update helper's status. |
 | `/server/update` | POST | Request the latest release for the host update helper to install (see `examples/self-update`). |
 | `/requests/api-call` | POST | Make an authenticated upstream call. |
 | `/routing/cooldown/reset` | POST | Clear credential cooldown. |

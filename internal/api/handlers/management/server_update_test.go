@@ -7,7 +7,9 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/MoeForge/moego/json"
 	"github.com/gin-gonic/gin"
@@ -72,6 +74,8 @@ type serverUpdateFixture struct {
 	dir     string
 	release map[string]any
 	status  int
+	// requests counts calls to the fake GitHub API.
+	requests atomic.Int32
 }
 
 // newServerUpdateFixture serves the latest release of CubityFirst/CLIProxyAPI from a local
@@ -92,6 +96,7 @@ func newServerUpdateFixture(t *testing.T, withDir bool) *serverUpdateFixture {
 		"assets":       []map[string]any{{"name": "checksums.txt"}, {"name": asset}},
 	}
 	github := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fixture.requests.Add(1)
 		if r.URL.Path != "/repos/CubityFirst/CLIProxyAPI/releases/latest" {
 			http.NotFound(w, r)
 			return
@@ -164,6 +169,38 @@ func TestGetServerUpdateReportsGitHubErrorsWithoutFailing(t *testing.T) {
 	code, payload := f.call(t, http.MethodGet, "")
 	if code != http.StatusOK || payload["latest"] != nil || !strings.Contains(payload["error"].(string), "403") || payload["apply_enabled"] != false {
 		t.Fatalf("status %d, payload = %v", code, payload)
+	}
+}
+
+func TestServerUpdateReusesGitHubLookupForAMinute(t *testing.T) {
+	f := newServerUpdateFixture(t, true)
+	now := time.Date(2026, 11, 26, 12, 0, 0, 0, time.UTC)
+	f.handler.serverRelease.nowFunc = func() time.Time { return now }
+
+	for i := 0; i < 3; i++ {
+		if code, payload := f.call(t, http.MethodGet, ""); code != http.StatusOK || payload["update_available"] != true {
+			t.Fatalf("GET %d: status %d, payload = %v", i, code, payload)
+		}
+	}
+	now = now.Add(serverReleaseCacheTTL - time.Second)
+	if code, payload := f.call(t, http.MethodPost, ""); code != http.StatusAccepted {
+		t.Fatalf("POST: status %d, payload = %v", code, payload)
+	}
+	if got := f.requests.Load(); got != 1 {
+		t.Fatalf("GitHub requests = %d, want 1", got)
+	}
+
+	// Once it expires the next check asks again, and an error is kept the same way, so a
+	// rate-limited check isn't retried on every poll.
+	now = now.Add(time.Second)
+	f.status = http.StatusForbidden
+	for i := 0; i < 2; i++ {
+		if _, payload := f.call(t, http.MethodGet, ""); payload["latest"] != nil || !strings.Contains(payload["error"].(string), "403") {
+			t.Fatalf("GET after expiry %d: payload = %v", i, payload)
+		}
+	}
+	if got := f.requests.Load(); got != 2 {
+		t.Fatalf("GitHub requests = %d, want 2", got)
 	}
 }
 
